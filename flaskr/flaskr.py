@@ -1,7 +1,7 @@
 # all the imports
 import os
 import sqlite3
-from flask import Flask, request, session, g, redirect, url_for, abort, render_tempalte, flash
+from flask import Flask, request, session, g, redirect, url_for, abort, render_template, flash
 
 # The next few lines create the actual application instance and initialize it with the config from this same file.  However, a cleaner solution is to create a separate .ini or .py file, load that, and import the values from there.
 
@@ -17,7 +17,7 @@ app.config.update(dict(
 	PASSWORD='default'
 ))
 
-app.config.from_envar('FLASKR_SETTINGS', silent=True) #silent here just tells flask to not complain if the environment variable is not found.
+app.config.from_envvar('FLASKR_SETTINGS', silent=True) #silent here just tells flask to not complain if the environment variable is not found.
 
 # Operating systems know the concept of the PWD for each process.  However, more than one application may run in a single process.  So we use app.root_path.  Together with the os.path module, files can be easily found.  For this example we place the database right next to the application.  For a real-world application, it's recommended to use Instance Folders instead.
 # the SECRET_KEY here keeps the client/server connection secure.
@@ -35,7 +35,7 @@ def get_db():
 	"""Opens a new database connection if there is none yet for the current application context."""
 	if not hasattr(g, 'sqlite_db'):
 		g.sqlite_db = connect_db()
-	return g.sqlite_db
+		return g.sqlite_db
 
 # Called every time the app context tears down.  App context is created before the request comes in and is destroyed (torn down) whenever the request finishes.
 @app.teardown_appcontext
@@ -43,4 +43,20 @@ def close_db(error):
 	"""Closes the database again at the end of the request."""
 	if hasattr(g, 'sqlite_db'):
 		g.sqlite_db.close()
+
+def init_db():
+	db = get_db()
+	with app.open_resource('schema.sql', mode='r') as f:
+		db.cursor().executescript(f.read())
+		db.commit()
+
+#The app.cli.command decorator registers a new command with the flask script.  When the command executes, Flask will automatically create an application context which is bound to the right application.  Within the function you can then access flask.g and other things as you might expect.  When the script ends, the application context tears down and the database connection is released.
+
+#To run this, execute the following in bash:
+#$flask initdb
+@app.cli.command('initdb')
+def initdb_command():
+	"""Initializes the database."""
+	init_db()
+	print('Initialized the database.')
 
